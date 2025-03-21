@@ -1,11 +1,6 @@
 TODO:
+    - [ ] Figure out how to write outb ourselves.
+          * Learn how to do inline assembly
     - [ ] Setup GDT
     - [ ] Setup IDT
-    - [ ] Setup .gdbinit so that we don't have to manually do 
-            load build/foundryos
-            target remote localhost:1234
-        every time we want to debug
-    - [ ] Add a flag which will automatically add `-s -S` to qemu
-          in run.sh when we want to debug stuff.
-    - [ ] Figure out how the framebuffer works on draw a rectangle.
 

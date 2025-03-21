@@ -1,29 +1,17 @@
-#include <stdint.h>
-#include <stddef.h>
-#include <stdbool.h>
+#include "util.h"
+#include "string.h"
+#include "drivers/serial.h"
 #include <limine.h>
-
-// Set the base revision to 3, this is recommended as this is the latest
-// base revision described by the Limine boot protocol specification.
-// See specification for further info.
 
 __attribute__((used, section(".limine_requests")))
 static volatile LIMINE_BASE_REVISION(3);
 
-// The Limine requests can be placed anywhere, but it is important that
-// the compiler does not optimise them away, so, usually, they should
-// be made volatile or equivalent, _and_ they should be accessed at least
-// once or marked as used with the "used" attribute as done here.
-
 __attribute__((used, section(".limine_requests")))
 static volatile struct limine_framebuffer_request framebuffer_request = {
     .id = LIMINE_FRAMEBUFFER_REQUEST,
-    .revision = 0
-
+    .revision = 0,
+    .response = NULL
 };
-
-// Finally, define the start and end markers for the Limine requests.
-// These can also be moved anywhere, to any .c file, as seen fit.
 
 __attribute__((used, section(".limine_requests_start")))
 static volatile LIMINE_REQUESTS_START_MARKER;
@@ -31,44 +19,38 @@ static volatile LIMINE_REQUESTS_START_MARKER;
 __attribute__((used, section(".limine_requests_end")))
 static volatile LIMINE_REQUESTS_END_MARKER;
 
-// GCC and Clang reserve the right to generate calls to the following
-// 4 functions even if they are not directly called.
-// Implement them as the C specification mandates.
-// DO NOT remove or rename these functions, or stuff will eventually break!
-// They CAN be moved to a different .c file.
 
-void* memcpy(void* dest, const void* src, size_t n) {
-    uint8_t *pdest = (uint8_t *)dest;
-    const uint8_t *psrc = (const uint8_t *)src;
+void* memcpy(void* dest, const void* src, u64 n) {
+    u8 *pdest = (u8 *)dest;
+    const u8 *psrc = (const u8 *)src;
 
-    for (size_t i = 0; i < n; i++) {
+    for (u64 i = 0; i < n; i++) {
         pdest[i] = psrc[i];
     }
 
     return dest;
 }
 
-void *memset(void *s, int c, size_t n) {
-    uint8_t *p = (uint8_t *)s;
+void *memset(void *s, int c, u64 n) {
+    u8 *p = (u8 *)s;
 
-    for (size_t i = 0; i < n; i++) {
-        p[i] = (uint8_t)c;
+    for (u64 i = 0; i < n; i++) {
+        p[i] = (u8)c;
     }
 
     return s;
 }
 
-void* memmove(void* dest, const void* src, size_t n) {
-    uint8_t *pdest = (uint8_t *)dest;
-    const uint8_t *psrc = (const uint8_t *)src;
+void* memmove(void* dest, const void* src, u64 n) {
+    u8 *pdest = (u8 *)dest;
+    const u8 *psrc = (const u8 *)src;
 
     if (src > dest) {
-        for (size_t i = 0; i < n; i++) {
-
+        for (u64 i = 0; i < n; i++) {
             pdest[i] = psrc[i];
         }
     } else if (src < dest) {
-        for (size_t i = n; i > 0; i--) {
+        for (u64 i = n; i > 0; i--) {
             pdest[i-1] = psrc[i-1];
         }
     }
@@ -76,49 +58,69 @@ void* memmove(void* dest, const void* src, size_t n) {
     return dest;
 }
 
-int memcmp(const void* s1, const void* s2, size_t n) {
-    const uint8_t *p1 = (const uint8_t *)s1;
-    const uint8_t *p2 = (const uint8_t *)s2;
+int memcmp(const void* s1, const void* s2, u64 n) {
+    const u8 *p1 = (const u8 *)s1;
+    const u8 *p2 = (const u8 *)s2;
 
-    for (size_t i = 0; i < n; i++) {
+    for (u64 i = 0; i < n; i++) {
         if (p1[i] != p2[i]) {
             return p1[i] < p2[i] ? -1 : 1;
         }
-
     }
 
     return 0;
 }
 
 // Halt and catch fire function.
-static void hcf(void) {
+void hcf(void) {
     for (;;) {
         asm ("hlt");
     }
+}
+
+
+bool framebuffer_draw_pixel(struct limine_framebuffer* framebuffer, u32 x, u32 y, u64 color) {
+    if (x > framebuffer->width || y > framebuffer->height) {
+        return false;
+    }
+
+    u32* screen = framebuffer->address;
+    u32 pitch_per_pixel = framebuffer->pitch/(framebuffer->bpp/8);
+    screen[pitch_per_pixel*y+x] = color;
+    return true;
 }
 
 void main(void) {
     // Ensure the bootloader actually understands our base revision (see spec).
     if (LIMINE_BASE_REVISION_SUPPORTED == false) {
         hcf();
-
     }
 
-    // Ensure we got a framebuffer.
-    if (framebuffer_request.response == NULL
-     || framebuffer_request.response->framebuffer_count < 1) {
+    if (framebuffer_request.response == NULL || framebuffer_request.response->framebuffer_count < 1) {
         hcf();
     }
 
-    // Fetch the first framebuffer.
-    struct limine_framebuffer *framebuffer = framebuffer_request.response->framebuffers[0];
+    struct limine_framebuffer* framebuffer = framebuffer_request.response->framebuffers[0];
 
-    // Note: we assume the framebuffer model is RGB with 32-bit pixels.
-    for (size_t i = 0; i < 100; i++) {
-        volatile uint32_t *fb_ptr = framebuffer->address;
-        fb_ptr[i * (framebuffer->pitch / 4) + i] = 0xffffff;
-
+    for (u32 i = 20; i < 800; i++) {
+        framebuffer_draw_pixel(framebuffer, i, 40,  0xFFFFFF);
+        framebuffer_draw_pixel(framebuffer, i, 500, 0xFFFFFF);
     }
-    // We're done, just hang...
+
+    for (u32 i = 40; i < 500; i++) {
+        framebuffer_draw_pixel(framebuffer, 20, i, 0xFFFFFF);
+        framebuffer_draw_pixel(framebuffer, 800, i, 0xFFFFFF);
+    }
+
+    for (u32 y = 41; y < 500; y++) {
+        for (u32 x = 21; x < 800; x++) {
+            framebuffer_draw_pixel(framebuffer, x, y, 0xFF00FF);
+        }
+    }
+
+    serial_init();
+
+    /* print_log(str_lit("hello world\n")); */
+
     hcf();
 }
