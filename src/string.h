@@ -5,4 +5,4 @@ typedef struct {
     u64 len;
 } String;
 
-#define str_lit(s) (String) { s, sizeof(s)-1 }
+#define strlit(s) (String) { s, sizeof(s)-1 }

@@ -8,15 +8,19 @@ else ifeq ($(QEMU_DEBUG_LOGS), true)
 QEMU_FLAGS += -d int
 endif
 
-CC := gcc
+CC  := clang
+
 CFLAGS := -Ilimine/ \
           -ggdb \
           -O0 \
           -Isrc \
           -o foundryos \
           -Wall \
+		  -Werror \
           -Wextra \
-          -Wno-error=unused-variable \
+	      -Wno-unused-variable \
+	      -Wno-unused-but-set-variable \
+		  -Wno-unused-parameter \
           -std=gnu11 \
           -ffreestanding \
           -fno-stack-protector \
@@ -36,28 +40,64 @@ CFLAGS := -Ilimine/ \
 LDFLAGS := -Wl,-m,elf_x86_64 \
            -Wl,--build-id=none \
            -nostdlib \
-           -no-pie \
            -z max-page-size=0x1000 \
            -T linker.ld
 
+MCFLAGS := -ggdb \
+	       -O0 \
+           -Wall \
+		   -Werror \
+           -Wextra \
+		   -fsanitize=address \
+	       -Imeta \
+		   -std=gnu11 \
+		   -Wno-unused-variable \
+		   -Wno-unused-but-set-variable \
+		   -Wno-int-to-pointer-cast \
+		   -Wno-switch \
+		   -Wno-unused-parameter \
+		   -o meta_generator \
+	       -masm=intel
+
+ifeq ($(CC), clang) 
+	CFLAGS += -target x86_64-unknown-none
+else ifeq ($(CC), gcc)
+	LDFLAGS += -no-pie
+endif
 
 INCOMPLETE_SRCFILE := $(filter %.c,$(shell cd src && find -L * -type f))
 SRCFILES := $(addprefix src/,$(INCOMPLETE_SRCFILE))
 OBJFILES := $(addprefix build/obj/,$(INCOMPLETE_SRCFILE:.c=.o))
 OUT := build/foundryos
 
+META_INCOMPLETE_SRCFILE := $(filter %.c,$(shell cd metagen && find -L * -type f))
+META_SRCFILES := $(addprefix metagen/,$(META_INCOMPLETE_SRCFILE))
+META_OBJFILES := $(addprefix build/metagen/obj/,$(META_INCOMPLETE_SRCFILE:.c=.o))
+META_OUT := build/meta_generator
+
 .PHONY: all clean
-all: dirs build_iso
+# all: dirs build_iso
+all: dirs build_metaprogram
 
 dirs:
-	@mkdir -p build/obj
+	@mkdir -p build/obj build/metagen/obj
 
 $(OBJFILES): $(SRCFILES)
 	@mkdir -p $(patsubst src/%,build/obj/%,$(dir $<))
-	@$(CC) $(CFLAGS) $(LDFLAGS) $(patsubst build/obj/%,src/%,$(patsubst %.o,%.c,$@)) -c -o $@
+	@$(CC) $(CFLAGS) $(patsubst build/obj/%,src/%,$(patsubst %.o,%.c,$@)) -c -o $@
 
 $(OUT): $(OBJFILES) 
-	@$(CC) $(CFLAGS) $(LDFLAGS) $(OBJFILES) -o $(OUT)
+	@$(CC) $(LDFLAGS) $(OBJFILES) -o $(OUT)
+
+$(META_OBJFILES): $(META_SRCFILES)
+	@mkdir -p $(patsubst metagen/%,build/metagen/obj/%,$(dir $<))
+	@$(CC) $(MCFLAGS) $(patsubst build/metagen/obj/%,metagen/%,$(patsubst %.o,%.c,$@)) -c -o $@
+
+build_metaprogram: $(META_OBJFILES) 
+	@$(CC) $(META_OBJFILES) -lasan -o $(META_OUT)
+
+run_metaprogram:
+	@build/meta_generator
 
 build_iso: $(OUT)
 	@mkdir -p build/iso_root

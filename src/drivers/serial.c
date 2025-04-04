@@ -1,25 +1,24 @@
-#include "../util.h"
-#include "../string.h"
+#include <util.h>
+#include <string.h>
 #include "serial.h"
 
 void outb(u16 port, u8 value) {
-    asm(
-            "outb %0, %1"
-            : 
-            : "Nd" (port), "a" (value)
+    asm (
+            "out %0, %1"
+            :
+            : "Nd" (port), "a" (value) 
             : "memory"
     );
 }
 
 u8 inb(u16 port) {
     u8 value;
-    asm(
-            "inb %0, %1"
-            : "=a" (value)
-            : "Nd" (port)
+    asm (
+            "in %0, %1" 
+            : "=a" (value) 
+            : "Nd" (port) 
             : "memory"
     );
-
     return value;
 }
 

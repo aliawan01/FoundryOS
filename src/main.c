@@ -1,7 +1,7 @@
-#include "util.h"
-#include "string.h"
-#include "drivers/serial.h"
 #include <limine.h>
+#include <util.h>
+#include <string.h>
+#include "drivers/serial.h"
 
 __attribute__((used, section(".limine_requests")))
 static volatile LIMINE_BASE_REVISION(3);
@@ -120,7 +120,7 @@ void main(void) {
 
     serial_init();
 
-    /* print_log(str_lit("hello world\n")); */
+    /* print_log(strlit("hello world\n")); */
 
     hcf();
 }

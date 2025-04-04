@@ -1,0 +1,9 @@
+TODO:
+    - Make the STR_LIST_FOREACH function just use a StringList instead of StringList*
+    - Store string structs in an array, memory stored in arena variable passed into the function
+      for final struct string.
+    - Fix the bug with the some enums which are being generated being invalid and also
+      find a way to use information from tokens to assign the values the right meta
+      types instead of relying purely on the type strings.
+    - In neovim maybe use set colorcolumn=80? (May have to make font smaller
+      to support it).

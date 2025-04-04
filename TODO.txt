@@ -3,4 +3,3 @@ TODO:
           * Learn how to do inline assembly
     - [ ] Setup GDT
     - [ ] Setup IDT
-
